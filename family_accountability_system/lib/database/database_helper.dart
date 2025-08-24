@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
+import '../utils/app_logger.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -19,18 +20,38 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    // Get the directory for storing the database
-    final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
-    final String databasePath = path.join(appDocumentsDir.path, _databaseName);
+    AppLogger.database('INIT', 'Starting database initialization');
+    
+    // Get the directory where the app executable is located
+    String databasePath;
+    
+    try {
+      // Try to get the executable directory (for built app)
+      final executablePath = Platform.resolvedExecutable;
+      final executableDir = path.dirname(executablePath);
+      databasePath = path.join(executableDir, _databaseName);
+      AppLogger.database('INIT', 'Using executable directory: $executableDir');
+      AppLogger.database('INIT', 'Database path: $databasePath');
+    } catch (e) {
+      // Fallback to Documents directory (for development)
+      AppLogger.warning('Failed to get executable directory, falling back to Documents', e);
+      final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+      databasePath = path.join(appDocumentsDir.path, _databaseName);
+      AppLogger.database('INIT', 'Using Documents directory: ${appDocumentsDir.path}');
+      AppLogger.database('INIT', 'Database path: $databasePath');
+    }
     
     // Check if database file exists
     final bool exists = await File(databasePath).exists();
+    AppLogger.database('INIT', 'Database exists: $exists');
     
     if (!exists) {
       // Database doesn't exist, will be created with password
+      AppLogger.database('INIT', 'Database does not exist, throwing exception');
       throw DatabaseNotExistsException();
     }
 
+    AppLogger.database('INIT', 'Opening existing database with password');
     // Open existing database with password
     return await openDatabase(
       databasePath,
@@ -48,28 +69,76 @@ class DatabaseHelper {
   }
 
   Future<Database> createNewDatabase(String password) async {
-    final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
-    final String databasePath = path.join(appDocumentsDir.path, _databaseName);
+    AppLogger.database('CREATE', 'Starting new database creation');
+    
+    // Get the directory where the app executable is located
+    String databasePath;
+    
+    try {
+      // Try to get the executable directory (for built app)
+      final executablePath = Platform.resolvedExecutable;
+      final executableDir = path.dirname(executablePath);
+      databasePath = path.join(executableDir, _databaseName);
+      AppLogger.database('CREATE', 'Using executable directory: $executableDir');
+      AppLogger.database('CREATE', 'Database path: $databasePath');
+      
+      // Check if directory is writable
+      final directory = Directory(executableDir);
+      final canWrite = await directory.exists();
+      AppLogger.database('CREATE', 'Directory exists: $canWrite');
+      
+      if (canWrite) {
+        // Try to create a test file to verify write permissions
+        try {
+          final testFile = File(path.join(executableDir, 'test_write.tmp'));
+          await testFile.writeAsString('test');
+          await testFile.delete();
+          AppLogger.database('CREATE', 'Write permission test: SUCCESS');
+        } catch (e) {
+          AppLogger.error('Write permission test failed', e);
+        }
+      }
+    } catch (e) {
+      // Fallback to Documents directory (for development)
+      AppLogger.warning('Failed to get executable directory, falling back to Documents', e);
+      final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+      databasePath = path.join(appDocumentsDir.path, _databaseName);
+      AppLogger.database('CREATE', 'Using Documents directory: ${appDocumentsDir.path}');
+      AppLogger.database('CREATE', 'Database path: $databasePath');
+    }
     
     _currentPassword = password;
+    AppLogger.database('CREATE', 'Password set, creating database');
     
-    return await openDatabase(
-      databasePath,
-      version: _databaseVersion,
-      password: password,
-      onCreate: _createTables,
-      onUpgrade: _onUpgrade,
-    );
+    try {
+      final db = await openDatabase(
+        databasePath,
+        version: _databaseVersion,
+        password: password,
+        onCreate: _createTables,
+        onUpgrade: _onUpgrade,
+      );
+      AppLogger.database('CREATE', 'Database created successfully');
+      _database = db;
+      return db;
+    } catch (e, stackTrace) {
+      AppLogger.error('Failed to create database', e, stackTrace);
+      rethrow;
+    }
   }
 
   Future<void> _createTables(Database db, int version) async {
-    // Create users table
-    await db.execute('''
-      CREATE TABLE users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL
-      )
-    ''');
+    AppLogger.database('CREATE_TABLES', 'Starting table creation');
+    
+    try {
+      // Create users table
+      AppLogger.database('CREATE_TABLES', 'Creating users table');
+      await db.execute('''
+        CREATE TABLE users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL
+        )
+      ''');
 
     // Create categories table
     await db.execute('''
@@ -129,8 +198,14 @@ class DatabaseHelper {
       )
     ''');
 
-    // Seed initial data
-    await _seedInitialData(db);
+      // Seed initial data
+      AppLogger.database('CREATE_TABLES', 'All tables created, seeding initial data');
+      await _seedInitialData(db);
+      AppLogger.database('CREATE_TABLES', 'Table creation and seeding completed successfully');
+    } catch (e, stackTrace) {
+      AppLogger.error('Failed to create tables', e, stackTrace);
+      rethrow;
+    }
   }
 
   Future<void> _seedInitialData(Database db) async {

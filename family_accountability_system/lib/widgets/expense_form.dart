@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/expense.dart';
+import '../database/database_helper.dart';
 
 class ExpenseForm extends StatefulWidget {
   final Expense? expense;
@@ -118,10 +119,46 @@ class _ExpenseFormState extends State<ExpenseForm> {
     );
   }
 
-  void _saveExpense() {
+  Future<void> _saveExpense() async {
     if (_formKey.currentState?.validate() ?? false) {
-      // TODO: Implement expense saving
-      Navigator.of(context).pop(true);
+      try {
+        final expense = Expense(
+          id: widget.expense?.id,
+          entryDate: DateTime.now(),
+          selectedDate: _selectedDate ?? widget.selectedMonth,
+          description: _descriptionController.text.trim(),
+          value: double.parse(_valueController.text),
+          currency: _currency,
+          userId: widget.userId,
+          isTaxDeductible: _isTaxDeductible,
+          isShared: _isShared,
+        );
+
+        final db = await DatabaseHelper().database;
+        
+        if (widget.expense == null) {
+          // Insert new expense
+          await db.insert('expenses', expense.toMap());
+        } else {
+          // Update existing expense
+          await db.update(
+            'expenses',
+            expense.toMap(),
+            where: 'id = ?',
+            whereArgs: [expense.id],
+          );
+        }
+
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error saving expense: $e')),
+          );
+        }
+      }
     }
   }
 

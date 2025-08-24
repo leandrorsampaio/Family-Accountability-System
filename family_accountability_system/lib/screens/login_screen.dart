@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../database/database_helper.dart';
+import '../utils/app_logger.dart';
 import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -25,15 +26,33 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _checkDatabaseExists() async {
+    AppLogger.auth('Checking if database exists');
+    
     try {
-      final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
-      final String databasePath = path.join(appDocumentsDir.path, 'database.db');
+      // Check in executable directory first
+      String databasePath;
+      
+      try {
+        final executablePath = Platform.resolvedExecutable;
+        final executableDir = path.dirname(executablePath);
+        databasePath = path.join(executableDir, 'database.db');
+        AppLogger.auth('Checking database path: $databasePath');
+      } catch (e) {
+        // Fallback to Documents directory
+        AppLogger.warning('Failed to get executable directory, checking Documents', e);
+        final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+        databasePath = path.join(appDocumentsDir.path, 'database.db');
+        AppLogger.auth('Checking fallback database path: $databasePath');
+      }
+      
       final bool exists = await File(databasePath).exists();
+      AppLogger.auth('Database exists: $exists at $databasePath');
       
       setState(() {
         _databaseExists = exists;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.error('Error checking database existence', e, stackTrace);
       setState(() {
         _databaseExists = false;
       });
@@ -41,7 +60,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    AppLogger.auth('Login attempt started');
+    
     if (_passwordController.text.isEmpty) {
+      AppLogger.auth('Login failed: empty password');
       _showError('Please enter a password');
       return;
     }
@@ -53,22 +75,29 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final dbHelper = DatabaseHelper();
       DatabaseHelper.setPassword(_passwordController.text);
+      AppLogger.auth('Password set, database exists: $_databaseExists');
       
       if (_databaseExists) {
         // Try to open existing database
+        AppLogger.auth('Attempting to open existing database');
         await dbHelper.database;
+        AppLogger.auth('Successfully opened existing database');
       } else {
         // Create new database
+        AppLogger.auth('Attempting to create new database');
         await dbHelper.createNewDatabase(_passwordController.text);
+        AppLogger.auth('Successfully created new database');
       }
 
       // Navigate to main screen
+      AppLogger.auth('Login successful, navigating to main screen');
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const MainScreen()),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.error('Login failed', e, stackTrace);
       _showError(_databaseExists 
         ? 'Invalid password. Please try again.' 
         : 'Failed to create database. Please try again.');
