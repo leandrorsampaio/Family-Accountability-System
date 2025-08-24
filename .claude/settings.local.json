@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(flutter:*)",
-      "Bash(pod repo update:*)"
+      "Bash(pod repo update:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }

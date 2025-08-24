@@ -48,8 +48,19 @@ A Flutter desktop application for managing family expenses with local SQLite dat
 - `flutter test`: Run unit tests
 - `flutter analyze`: Static analysis
 
+## Build & Distribution
+- **Build Location**: `/Users/leandrorossisampaio/Desktop/FAS/`
+- **Build Command**: `flutter build macos --release && cp -r build/macos/Build/Products/Release/family_accountability_system.app /Users/leandrorossisampaio/Desktop/FAS/`
+- **App Size**: ~44MB (self-contained executable)
+
 ## Testing Strategy
 - Unit tests for database operations
 - Widget tests for UI components  
 - Integration tests for complete workflows
 - Platform-specific testing on Windows/macOS/Linux
+
+## 📋 IMPORTANT REQUIREMENTS
+- **Project Documentation**: Always keep `projectOverview.md` updated whenever project structure, features, or architecture changes
+- **File Tracking**: Document any new files, moved files, or structural changes in the overview
+- **Feature Status**: Maintain current status of completed vs pending features
+- **Architecture Notes**: Update architecture explanations when patterns or approaches change
