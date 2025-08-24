@@ -30,21 +30,10 @@ class _LoginScreenState extends State<LoginScreen> {
     AppLogger.auth('Checking if database exists');
     
     try {
-      // Check in executable directory first
-      String databasePath;
-      
-      try {
-        final executablePath = Platform.resolvedExecutable;
-        final executableDir = path.dirname(executablePath);
-        databasePath = path.join(executableDir, 'database.db');
-        AppLogger.auth('Checking database path: $databasePath');
-      } catch (e) {
-        // Fallback to Documents directory
-        AppLogger.warning('Failed to get executable directory, checking Documents', e);
-        final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
-        databasePath = path.join(appDocumentsDir.path, 'database.db');
-        AppLogger.auth('Checking fallback database path: $databasePath');
-      }
+      // Always check Documents directory (macOS app sandboxing)
+      final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+      final String databasePath = path.join(appDocumentsDir.path, 'database.db');
+      AppLogger.auth('Checking database path: $databasePath');
       
       final bool exists = await File(databasePath).exists();
       AppLogger.auth('Database exists: $exists at $databasePath');
@@ -116,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Database Not Found'),
-        content: const Text('The database file \'database.db\' was not found. Do you want to create a new one?'),
+        content: const Text('The encrypted database file was not found in your Documents folder. Do you want to create a new one?\n\nThe database will be stored in:\n~/Documents/database.db'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -224,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(width: 8),
                           const Expanded(
-                            child: Text('Creating new encrypted database'),
+                            child: Text('Creating new encrypted database in Documents folder'),
                           ),
                         ],
                       ),

@@ -136,6 +136,7 @@ cp -r build/macos/Build/Products/Release/family_accountability_system.app /Users
 ## 📦 Build Distribution
 - **Location**: `/Users/leandrorossisampaio/Desktop/FAS/family_accountability_system.app`
 - **Size**: ~44MB self-contained executable
+- **Database**: Stored in `~/Documents/database.db` (due to macOS sandboxing)
 - **Requirements**: macOS (no additional dependencies needed)
 
 ## 📊 Current Features

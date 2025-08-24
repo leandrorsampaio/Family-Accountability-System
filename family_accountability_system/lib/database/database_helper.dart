@@ -22,23 +22,17 @@ class DatabaseHelper {
   Future<Database> _initDatabase() async {
     AppLogger.database('INIT', 'Starting database initialization');
     
-    // Get the directory where the app executable is located
+    // Always use Documents directory for database (macOS app sandboxing)
     String databasePath;
     
     try {
-      // Try to get the executable directory (for built app)
-      final executablePath = Platform.resolvedExecutable;
-      final executableDir = path.dirname(executablePath);
-      databasePath = path.join(executableDir, _databaseName);
-      AppLogger.database('INIT', 'Using executable directory: $executableDir');
-      AppLogger.database('INIT', 'Database path: $databasePath');
-    } catch (e) {
-      // Fallback to Documents directory (for development)
-      AppLogger.warning('Failed to get executable directory, falling back to Documents', e);
       final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
       databasePath = path.join(appDocumentsDir.path, _databaseName);
       AppLogger.database('INIT', 'Using Documents directory: ${appDocumentsDir.path}');
       AppLogger.database('INIT', 'Database path: $databasePath');
+    } catch (e) {
+      AppLogger.error('Failed to get Documents directory', e);
+      rethrow;
     }
     
     // Check if database file exists
@@ -71,26 +65,23 @@ class DatabaseHelper {
   Future<Database> createNewDatabase(String password) async {
     AppLogger.database('CREATE', 'Starting new database creation');
     
-    // Get the directory where the app executable is located
+    // Always use Documents directory for database (macOS app sandboxing)
     String databasePath;
     
     try {
-      // Try to get the executable directory (for built app)
-      final executablePath = Platform.resolvedExecutable;
-      final executableDir = path.dirname(executablePath);
-      databasePath = path.join(executableDir, _databaseName);
-      AppLogger.database('CREATE', 'Using executable directory: $executableDir');
+      final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+      databasePath = path.join(appDocumentsDir.path, _databaseName);
+      AppLogger.database('CREATE', 'Using Documents directory: ${appDocumentsDir.path}');
       AppLogger.database('CREATE', 'Database path: $databasePath');
       
       // Check if directory is writable
-      final directory = Directory(executableDir);
-      final canWrite = await directory.exists();
-      AppLogger.database('CREATE', 'Directory exists: $canWrite');
+      final canWrite = await appDocumentsDir.exists();
+      AppLogger.database('CREATE', 'Documents directory exists: $canWrite');
       
       if (canWrite) {
         // Try to create a test file to verify write permissions
         try {
-          final testFile = File(path.join(executableDir, 'test_write.tmp'));
+          final testFile = File(path.join(appDocumentsDir.path, 'test_write.tmp'));
           await testFile.writeAsString('test');
           await testFile.delete();
           AppLogger.database('CREATE', 'Write permission test: SUCCESS');
@@ -99,12 +90,8 @@ class DatabaseHelper {
         }
       }
     } catch (e) {
-      // Fallback to Documents directory (for development)
-      AppLogger.warning('Failed to get executable directory, falling back to Documents', e);
-      final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
-      databasePath = path.join(appDocumentsDir.path, _databaseName);
-      AppLogger.database('CREATE', 'Using Documents directory: ${appDocumentsDir.path}');
-      AppLogger.database('CREATE', 'Database path: $databasePath');
+      AppLogger.error('Failed to get Documents directory', e);
+      rethrow;
     }
     
     _currentPassword = password;
