@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../widgets/month_sidebar.dart';
 import '../widgets/expense_tabs.dart';
+import 'debug_logs_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -40,6 +41,15 @@ class _MainScreenState extends State<MainScreen> {
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const DebugLogsScreen()),
+              );
+            },
+            tooltip: 'Debug Logs',
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {

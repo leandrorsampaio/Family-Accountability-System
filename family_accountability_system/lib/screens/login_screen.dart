@@ -5,6 +5,7 @@ import 'package:path/path.dart' as path;
 import '../database/database_helper.dart';
 import '../utils/app_logger.dart';
 import 'main_screen.dart';
+import 'debug_logs_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -150,6 +151,22 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text(''),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const DebugLogsScreen()),
+              );
+            },
+            tooltip: 'View Debug Logs',
+          ),
+        ],
+      ),
       body: Container(
         width: double.infinity,
         height: double.infinity,

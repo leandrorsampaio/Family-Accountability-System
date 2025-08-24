@@ -15,7 +15,8 @@ family_accountability_system/
 │   │   └── user.dart            
 │   ├── screens/                  # 📱 Full-screen pages
 │   │   ├── login_screen.dart     # Password entry & database creation
-│   │   └── main_screen.dart      # Main app layout with sidebar/tabs
+│   │   ├── main_screen.dart      # Main app layout with sidebar/tabs
+│   │   └── debug_logs_screen.dart # In-app log viewer for debugging
 │   ├── widgets/                  # 🧩 Reusable UI components
 │   │   ├── month_sidebar.dart    # Left sidebar month navigation
 │   │   ├── expense_tabs.dart     # Husband/Wife tabs
