@@ -22,17 +22,40 @@ class DatabaseHelper {
   Future<Database> _initDatabase() async {
     AppLogger.database('INIT', 'Starting database initialization');
     
-    // Always use Documents directory for database (macOS app sandboxing)
+    // Get database path - try app directory first, fallback to Documents
     String databasePath;
     
     try {
+      // Try to get the directory where the .app file is located (not inside it)
+      final executablePath = Platform.resolvedExecutable;
+      final appBundle = executablePath.replaceAll('/Contents/MacOS/family_accountability_system', '');
+      final appDirectory = path.dirname(appBundle);
+      databasePath = path.join(appDirectory, _databaseName);
+      
+      AppLogger.database('INIT', 'Executable path: $executablePath');
+      AppLogger.database('INIT', 'App bundle: $appBundle');
+      AppLogger.database('INIT', 'App directory: $appDirectory');
+      AppLogger.database('INIT', 'Database path: $databasePath');
+      
+      // Test if we can write to the app directory
+      final testPath = path.join(appDirectory, 'test_write.tmp');
+      try {
+        await File(testPath).writeAsString('test');
+        await File(testPath).delete();
+        AppLogger.database('INIT', 'App directory is writable');
+      } catch (e) {
+        AppLogger.warning('App directory not writable, falling back to Documents', e);
+        final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+        databasePath = path.join(appDocumentsDir.path, _databaseName);
+        AppLogger.database('INIT', 'Using Documents directory: ${appDocumentsDir.path}');
+        AppLogger.database('INIT', 'Database path: $databasePath');
+      }
+    } catch (e) {
+      AppLogger.error('Failed to determine app directory, using Documents', e);
       final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
       databasePath = path.join(appDocumentsDir.path, _databaseName);
-      AppLogger.database('INIT', 'Using Documents directory: ${appDocumentsDir.path}');
+      AppLogger.database('INIT', 'Using Documents directory fallback: ${appDocumentsDir.path}');
       AppLogger.database('INIT', 'Database path: $databasePath');
-    } catch (e) {
-      AppLogger.error('Failed to get Documents directory', e);
-      rethrow;
     }
     
     // Check if database file exists
@@ -65,33 +88,40 @@ class DatabaseHelper {
   Future<Database> createNewDatabase(String password) async {
     AppLogger.database('CREATE', 'Starting new database creation');
     
-    // Always use Documents directory for database (macOS app sandboxing)
+    // Get database path - try app directory first, fallback to Documents
     String databasePath;
     
     try {
-      final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
-      databasePath = path.join(appDocumentsDir.path, _databaseName);
-      AppLogger.database('CREATE', 'Using Documents directory: ${appDocumentsDir.path}');
+      // Try to get the directory where the .app file is located (not inside it)
+      final executablePath = Platform.resolvedExecutable;
+      final appBundle = executablePath.replaceAll('/Contents/MacOS/family_accountability_system', '');
+      final appDirectory = path.dirname(appBundle);
+      databasePath = path.join(appDirectory, _databaseName);
+      
+      AppLogger.database('CREATE', 'Executable path: $executablePath');
+      AppLogger.database('CREATE', 'App bundle: $appBundle');
+      AppLogger.database('CREATE', 'App directory: $appDirectory');
       AppLogger.database('CREATE', 'Database path: $databasePath');
       
-      // Check if directory is writable
-      final canWrite = await appDocumentsDir.exists();
-      AppLogger.database('CREATE', 'Documents directory exists: $canWrite');
-      
-      if (canWrite) {
-        // Try to create a test file to verify write permissions
-        try {
-          final testFile = File(path.join(appDocumentsDir.path, 'test_write.tmp'));
-          await testFile.writeAsString('test');
-          await testFile.delete();
-          AppLogger.database('CREATE', 'Write permission test: SUCCESS');
-        } catch (e) {
-          AppLogger.error('Write permission test failed', e);
-        }
+      // Test if we can write to the app directory
+      final testPath = path.join(appDirectory, 'test_write.tmp');
+      try {
+        await File(testPath).writeAsString('test');
+        await File(testPath).delete();
+        AppLogger.database('CREATE', 'App directory is writable - using FAS folder');
+      } catch (e) {
+        AppLogger.warning('App directory not writable, falling back to Documents', e);
+        final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+        databasePath = path.join(appDocumentsDir.path, _databaseName);
+        AppLogger.database('CREATE', 'Using Documents directory: ${appDocumentsDir.path}');
+        AppLogger.database('CREATE', 'Database path: $databasePath');
       }
     } catch (e) {
-      AppLogger.error('Failed to get Documents directory', e);
-      rethrow;
+      AppLogger.error('Failed to determine app directory, using Documents', e);
+      final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+      databasePath = path.join(appDocumentsDir.path, _databaseName);
+      AppLogger.database('CREATE', 'Using Documents directory fallback: ${appDocumentsDir.path}');
+      AppLogger.database('CREATE', 'Database path: $databasePath');
     }
     
     _currentPassword = password;

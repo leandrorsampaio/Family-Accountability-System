@@ -30,10 +30,39 @@ class _LoginScreenState extends State<LoginScreen> {
     AppLogger.auth('Checking if database exists');
     
     try {
-      // Always check Documents directory (macOS app sandboxing)
-      final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
-      final String databasePath = path.join(appDocumentsDir.path, 'database.db');
-      AppLogger.auth('Checking database path: $databasePath');
+      // Check app directory first, fallback to Documents
+      String databasePath;
+      
+      try {
+        // Try to get the directory where the .app file is located (not inside it)
+        final executablePath = Platform.resolvedExecutable;
+        final appBundle = executablePath.replaceAll('/Contents/MacOS/family_accountability_system', '');
+        final appDirectory = path.dirname(appBundle);
+        databasePath = path.join(appDirectory, 'database.db');
+        
+        AppLogger.auth('Checking FAS directory: $appDirectory');
+        AppLogger.auth('Checking database path: $databasePath');
+        
+        // Test if we can access the app directory
+        final testPath = path.join(appDirectory, 'test_read.tmp');
+        try {
+          await File(testPath).writeAsString('test');
+          await File(testPath).delete();
+          AppLogger.auth('FAS directory is accessible');
+        } catch (e) {
+          AppLogger.warning('FAS directory not accessible, checking Documents', e);
+          final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+          databasePath = path.join(appDocumentsDir.path, 'database.db');
+          AppLogger.auth('Using Documents directory: ${appDocumentsDir.path}');
+          AppLogger.auth('Checking database path: $databasePath');
+        }
+      } catch (e) {
+        AppLogger.error('Failed to determine app directory, using Documents', e);
+        final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
+        databasePath = path.join(appDocumentsDir.path, 'database.db');
+        AppLogger.auth('Using Documents directory fallback: ${appDocumentsDir.path}');
+        AppLogger.auth('Checking database path: $databasePath');
+      }
       
       final bool exists = await File(databasePath).exists();
       AppLogger.auth('Database exists: $exists at $databasePath');
@@ -105,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Database Not Found'),
-        content: const Text('The encrypted database file was not found in your Documents folder. Do you want to create a new one?\n\nThe database will be stored in:\n~/Documents/database.db'),
+        content: const Text('The encrypted database file was not found. Do you want to create a new one?\n\nThe database will be stored in the same folder as the app (FAS folder) if possible, otherwise in Documents folder.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -213,7 +242,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(width: 8),
                           const Expanded(
-                            child: Text('Creating new encrypted database in Documents folder'),
+                            child: Text('Creating new encrypted database in FAS folder (or Documents if needed)'),
                           ),
                         ],
                       ),
