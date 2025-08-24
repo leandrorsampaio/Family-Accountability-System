@@ -32,10 +32,18 @@ class _DebugLogsScreenState extends State<DebugLogsScreen> {
   }
 
   void _copyLogsToClipboard() {
-    final logs = InMemoryLogger.getLogs().join('\n');
-    Clipboard.setData(ClipboardData(text: logs));
+    final logs = InMemoryLogger.getLogs();
+    if (logs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No logs to copy')),
+      );
+      return;
+    }
+    
+    final logText = logs.join('\n');
+    Clipboard.setData(ClipboardData(text: logText));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Logs copied to clipboard')),
+      SnackBar(content: Text('${logs.length} log entries copied to clipboard')),
     );
   }
 
@@ -84,6 +92,22 @@ class _DebugLogsScreenState extends State<DebugLogsScreen> {
                 textAlign: TextAlign.center,
               ),
             ),
+            // Copy All Logs Button
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              child: ElevatedButton.icon(
+                onPressed: InMemoryLogger.getLogs().isEmpty ? null : _copyLogsToClipboard,
+                icon: const Icon(Icons.content_copy),
+                label: Text('Copy All ${InMemoryLogger.getLogs().length} Logs'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            
+            // Logs Display
             Expanded(
               child: InMemoryLogger.getLogs().isEmpty
                   ? const Center(
@@ -93,24 +117,27 @@ class _DebugLogsScreenState extends State<DebugLogsScreen> {
                         style: TextStyle(color: Colors.grey),
                       ),
                     )
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(8),
-                      itemCount: InMemoryLogger.getLogs().length,
-                      itemBuilder: (context, index) {
-                        final log = InMemoryLogger.getLogs()[index];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 1),
-                          child: SelectableText(
-                            log,
-                            style: TextStyle(
-                              fontFamily: 'Monaco',
-                              fontSize: 12,
-                              color: _getLogColor(log),
-                            ),
-                          ),
-                        );
-                      },
+                  : Container(
+                      margin: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[900],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey[700]!),
+                      ),
+                      child: SelectableText(
+                        InMemoryLogger.getLogs().join('\n'),
+                        style: const TextStyle(
+                          fontFamily: 'Monaco',
+                          fontSize: 12,
+                          color: Colors.white,
+                          height: 1.4,
+                        ),
+                        toolbarOptions: const ToolbarOptions(
+                          copy: true,
+                          selectAll: true,
+                        ),
+                      ),
                     ),
             ),
           ],
