@@ -7,11 +7,13 @@ import '../widgets/expense_form.dart';
 class ExpenseList extends StatefulWidget {
   final int userId;
   final DateTime selectedMonth;
+  final VoidCallback? onExpenseUpdated;
 
   const ExpenseList({
     super.key,
     required this.userId,
     required this.selectedMonth,
+    this.onExpenseUpdated,
   });
 
   @override
@@ -99,6 +101,7 @@ class _ExpenseListState extends State<ExpenseList> {
 
     if (result == true) {
       _loadExpenses();
+      widget.onExpenseUpdated?.call();
     }
   }
 
@@ -127,6 +130,7 @@ class _ExpenseListState extends State<ExpenseList> {
         final db = await DatabaseHelper().database;
         await db.delete('expenses', where: 'id = ?', whereArgs: [expense.id]);
         _loadExpenses();
+        widget.onExpenseUpdated?.call();
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

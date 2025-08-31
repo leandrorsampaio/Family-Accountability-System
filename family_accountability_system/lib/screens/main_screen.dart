@@ -14,6 +14,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  int _sidebarRefreshKey = 0;
 
   void _onMonthSelected(DateTime month) {
     setState(() {
@@ -23,6 +24,12 @@ class _MainScreenState extends State<MainScreen> {
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
+  }
+
+  void _refreshSidebar() {
+    setState(() {
+      _sidebarRefreshKey++;
+    });
   }
 
   @override
@@ -60,6 +67,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
       drawer: isDesktop ? null : Drawer(
         child: MonthSidebar(
+          key: ValueKey('sidebar_mobile_$_sidebarRefreshKey'),
           selectedMonth: _selectedMonth,
           onMonthSelected: _onMonthSelected,
         ),
@@ -70,6 +78,7 @@ class _MainScreenState extends State<MainScreen> {
             SizedBox(
               width: 280,
               child: MonthSidebar(
+                key: ValueKey('sidebar_desktop_$_sidebarRefreshKey'),
                 selectedMonth: _selectedMonth,
                 onMonthSelected: _onMonthSelected,
               ),
@@ -77,7 +86,10 @@ class _MainScreenState extends State<MainScreen> {
             const VerticalDivider(width: 1),
           ],
           Expanded(
-            child: ExpenseTabs(selectedMonth: _selectedMonth),
+            child: ExpenseTabs(
+              selectedMonth: _selectedMonth,
+              onExpenseUpdated: _refreshSidebar,
+            ),
           ),
         ],
       ),

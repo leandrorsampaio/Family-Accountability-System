@@ -256,6 +256,24 @@ class DatabaseHelper {
     // Handle database upgrades here
   }
 
+  Future<List<DateTime>> getMonthsWithData() async {
+    final db = await database;
+    
+    final List<Map<String, dynamic>> result = await db.rawQuery('''
+      SELECT DISTINCT 
+        strftime('%Y', selected_date) as year,
+        strftime('%m', selected_date) as month
+      FROM expenses 
+      ORDER BY year DESC, month DESC
+    ''');
+    
+    return result.map((row) {
+      final year = int.parse(row['year'] as String);
+      final month = int.parse(row['month'] as String);
+      return DateTime(year, month);
+    }).toList();
+  }
+
   Future<void> closeDatabase() async {
     if (_database != null) {
       await _database!.close();

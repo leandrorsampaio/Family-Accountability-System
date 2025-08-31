@@ -3,10 +3,12 @@ import '../widgets/expense_list.dart';
 
 class ExpenseTabs extends StatefulWidget {
   final DateTime selectedMonth;
+  final VoidCallback? onExpenseUpdated;
 
   const ExpenseTabs({
     super.key,
     required this.selectedMonth,
+    this.onExpenseUpdated,
   });
 
   @override
@@ -64,10 +66,12 @@ class _ExpenseTabsState extends State<ExpenseTabs> with SingleTickerProviderStat
               ExpenseList(
                 userId: 1, // Husband ID
                 selectedMonth: widget.selectedMonth,
+                onExpenseUpdated: widget.onExpenseUpdated,
               ),
               ExpenseList(
                 userId: 2, // Wife ID
                 selectedMonth: widget.selectedMonth,
+                onExpenseUpdated: widget.onExpenseUpdated,
               ),
             ],
           ),

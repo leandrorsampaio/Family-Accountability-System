@@ -3,7 +3,9 @@
     "allow": [
       "Bash(flutter:*)",
       "Bash(pod repo update:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(pkill:*)",
+      "Bash(open:*)"
     ],
     "deny": []
   }
