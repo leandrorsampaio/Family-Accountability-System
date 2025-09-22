@@ -5,7 +5,9 @@
       "Bash(pod repo update:*)",
       "Bash(cp:*)",
       "Bash(pkill:*)",
-      "Bash(open:*)"
+      "Bash(open:*)",
+      "Read(/Users/leandro/Desktop/**)",
+      "Read(/Users/leandro/Desktop/FAS/**)"
     ],
     "deny": []
   }

@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import '../database/database_helper.dart';
 
 class MonthSidebar extends StatefulWidget {
-  final DateTime selectedMonth;
+  final DateTime? selectedMonth;
   final Function(DateTime) onMonthSelected;
 
   const MonthSidebar({
@@ -17,18 +17,23 @@ class MonthSidebar extends StatefulWidget {
 }
 
 class _MonthSidebarState extends State<MonthSidebar> {
-  Map<int, List<DateTime>> _monthsByYear = {};
-  Set<int> _expandedYears = {};
+  List<DateTime> _currentYearMonths = [];
+  Map<int, List<DateTime>> _expenseMonthsByYear = {};
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadMonthsWithData();
+    _loadData();
   }
 
-  Future<void> _loadMonthsWithData() async {
+  Future<void> _loadData() async {
     try {
+      // Generate all 12 months for current year
+      final currentYear = DateTime.now().year;
+      _currentYearMonths = List.generate(12, (index) => DateTime(currentYear, index + 1));
+      
+      // Load months that actually have expense data for reference
       final monthsWithData = await DatabaseHelper().getMonthsWithData();
       final Map<int, List<DateTime>> groupedByYear = {};
       
@@ -36,26 +41,9 @@ class _MonthSidebarState extends State<MonthSidebar> {
         groupedByYear.putIfAbsent(month.year, () => []).add(month);
       }
       
-      // Sort months within each year by month descending
-      groupedByYear.forEach((year, months) {
-        months.sort((a, b) => b.month.compareTo(a.month));
-      });
-      
       setState(() {
-        _monthsByYear = groupedByYear;
+        _expenseMonthsByYear = groupedByYear;
         _isLoading = false;
-        
-        // Auto-expand the most recent year (current year or most recent year with data)
-        if (_monthsByYear.isNotEmpty) {
-          final currentYear = DateTime.now().year;
-          if (_monthsByYear.containsKey(currentYear)) {
-            _expandedYears.add(currentYear);
-          } else {
-            // Expand the most recent year with data
-            final mostRecentYear = _monthsByYear.keys.reduce((a, b) => a > b ? a : b);
-            _expandedYears.add(mostRecentYear);
-          }
-        }
       });
     } catch (e) {
       setState(() {
@@ -64,51 +52,10 @@ class _MonthSidebarState extends State<MonthSidebar> {
     }
   }
 
-  void _toggleYear(int year) {
-    setState(() {
-      if (_expandedYears.contains(year)) {
-        _expandedYears.remove(year);
-      } else {
-        _expandedYears.add(year);
-      }
-    });
-  }
-
-  void _addNewMonth(int year) {
-    // Find the next available month in this year
-    final existingMonths = _monthsByYear[year] ?? [];
-    DateTime? newMonth;
-    
-    if (existingMonths.isEmpty) {
-      // No months exist for this year, default to current month if it's current year, otherwise January
-      if (year == DateTime.now().year) {
-        newMonth = DateTime(year, DateTime.now().month);
-      } else {
-        newMonth = DateTime(year, 1);
-      }
-    } else {
-      // Find a month that doesn't exist yet, starting from January
-      int monthToAdd = 1;
-      while (monthToAdd <= 12) {
-        if (!existingMonths.any((m) => m.month == monthToAdd)) {
-          newMonth = DateTime(year, monthToAdd);
-          break;
-        }
-        monthToAdd++;
-      }
-      
-      // If all months exist, don't do anything
-      if (monthToAdd > 12) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('All months already have data for this year')),
-        );
-        return;
-      }
-    }
-    
-    if (newMonth != null) {
-      widget.onMonthSelected(newMonth);
-    }
+  bool _hasExpenseData(DateTime month) {
+    final yearMonths = _expenseMonthsByYear[month.year];
+    if (yearMonths == null) return false;
+    return yearMonths.any((m) => m.year == month.year && m.month == month.month);
   }
 
   @override
@@ -141,148 +88,81 @@ class _MonthSidebarState extends State<MonthSidebar> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _monthsByYear.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.calendar_today,
-                              size: 64,
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No expense data found',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Start adding expenses to see months here',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: () => widget.onMonthSelected(DateTime.now()),
-                              icon: const Icon(Icons.add),
-                              label: const Text('Start This Month'),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        children: _buildYearSections(),
-                      ),
+                : ListView(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    children: _buildMonthList(),
+                  ),
           ),
         ],
       ),
     );
   }
 
-  List<Widget> _buildYearSections() {
-    final sortedYears = _monthsByYear.keys.toList()..sort((a, b) => b.compareTo(a));
-    final List<Widget> sections = [];
+  List<Widget> _buildMonthList() {
+    final currentYear = DateTime.now().year;
+    final List<Widget> monthWidgets = [];
 
-    for (final year in sortedYears) {
-      final isExpanded = _expandedYears.contains(year);
-      final months = _monthsByYear[year]!;
-      final isCurrentYear = year == DateTime.now().year;
-
-      // Year header
-      sections.add(
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => _toggleYear(year),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    Icon(
-                      isExpanded ? Icons.expand_less : Icons.expand_more,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '$year',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    if (isCurrentYear) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          'Current',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const Spacer(),
-                    Text(
-                      '${months.length} month${months.length != 1 ? 's' : ''}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => _addNewMonth(year),
-                      icon: const Icon(Icons.add, size: 18),
-                      tooltip: 'Add new month',
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      padding: EdgeInsets.zero,
-                    ),
-                  ],
+    // Year header
+    monthWidgets.add(
+      Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.calendar_today,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '$currentYear',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Current Year',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-          ),
+          ],
         ),
-      );
+      ),
+    );
 
-      // Months list (if expanded)
-      if (isExpanded) {
-        for (final month in months) {
-          sections.add(_buildMonthItem(month));
-        }
-      }
+    // Add all 12 months
+    for (final month in _currentYearMonths) {
+      monthWidgets.add(_buildMonthItem(month));
     }
 
-    // Add current year if it doesn't exist in the data
-    final currentYear = DateTime.now().year;
-    if (!_monthsByYear.containsKey(currentYear)) {
-      sections.add(_buildEmptyYearSection(currentYear));
-    }
-
-    return sections;
+    return monthWidgets;
   }
 
   Widget _buildMonthItem(DateTime month) {
-    final isSelected = month.year == widget.selectedMonth.year && 
-                      month.month == widget.selectedMonth.month;
+    final isSelected = widget.selectedMonth != null &&
+                      month.year == widget.selectedMonth!.year && 
+                      month.month == widget.selectedMonth!.month;
     final isCurrentMonth = month.year == DateTime.now().year && 
                           month.month == DateTime.now().month;
+    final hasData = _hasExpenseData(month);
 
     return Container(
-      margin: const EdgeInsets.only(left: 24, right: 8, top: 2, bottom: 2),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Material(
         color: isSelected 
             ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
@@ -292,15 +172,18 @@ class _MonthSidebarState extends State<MonthSidebar> {
           borderRadius: BorderRadius.circular(8),
           onTap: () => widget.onMonthSelected(month),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
                 Icon(
-                  isCurrentMonth ? Icons.today : Icons.calendar_month,
-                  size: 18,
+                  isCurrentMonth ? Icons.today : 
+                  hasData ? Icons.calendar_month : Icons.calendar_month_outlined,
+                  size: 20,
                   color: isSelected
                       ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      : hasData
+                          ? Theme.of(context).colorScheme.onSurface.withOpacity(0.8)
+                          : Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -309,11 +192,13 @@ class _MonthSidebarState extends State<MonthSidebar> {
                     children: [
                       Text(
                         DateFormat('MMMM').format(month),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                           color: isSelected
                               ? Theme.of(context).colorScheme.primary
-                              : null,
+                              : hasData
+                                  ? null
+                                  : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                         ),
                       ),
                       if (isCurrentMonth)
@@ -323,10 +208,33 @@ class _MonthSidebarState extends State<MonthSidebar> {
                             color: Theme.of(context).colorScheme.primary,
                             fontStyle: FontStyle.italic,
                           ),
+                        )
+                      else if (!hasData)
+                        Text(
+                          'No expenses yet',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                     ],
                   ),
                 ),
+                if (hasData)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.receipt,
+                      size: 12,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                if (isSelected)
+                  const SizedBox(width: 8),
                 if (isSelected)
                   Icon(
                     Icons.check_circle,
@@ -341,62 +249,4 @@ class _MonthSidebarState extends State<MonthSidebar> {
     );
   }
 
-  Widget _buildEmptyYearSection(int year) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Icon(
-                Icons.calendar_today,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '$year',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  'Current',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontSize: 10,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                'No data',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () => _addNewMonth(year),
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Add Month'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  minimumSize: const Size(0, 32),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
